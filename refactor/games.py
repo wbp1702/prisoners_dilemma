@@ -52,7 +52,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
         # Play game in groups
         for group in groups.values():
             actions = [agent.cooperates() for agent in group]
-            payoffs = utils.snowdrift_game(actions, cost_benefit_ratio)
+            payoffs = utils.prisoners_dilemma(actions, cost_benefit_ratio)
             for idx, agent in enumerate(group): agent.reward = payoffs[actions[idx]]
 
         # Tournament selection
@@ -152,7 +152,7 @@ def group_split_game_averaged(num_runs: int, num_agents: int, num_groups: int, n
         
         averaged_cooperation += np.divide(results[4], num_agents)
 
-    return averaged_cooperation
+    return averaged_cooperation / num_runs
     
 
 
