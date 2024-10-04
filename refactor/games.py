@@ -32,9 +32,9 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 recorded_group_cooperators[idx].append(np.sum([agent.cooperates() for agent in groups[idx]]))
                 recorded_group_rewards[idx].append(np.sum([agent.reward for agent in  groups[idx]]))
             else:
-                recorded_group_population[idx].append(0)
-                recorded_group_cooperators[idx].append(float('0'))
-                recorded_group_rewards[idx].append(float('0'))
+                recorded_group_population[idx].append(0.0)
+                recorded_group_cooperators[idx].append(0.0)
+                recorded_group_rewards[idx].append(0.0)
 
         num_non_empty_groups = 0
         num_cooperators = 0
@@ -52,7 +52,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
         # Play game in groups
         for group in groups.values():
             actions = [agent.cooperates() for agent in group]
-            payoffs = utils.prisoners_dilemma(actions, cost_benefit_ratio)
+            payoffs = utils.snowdrift_game(actions, cost_benefit_ratio)
             for idx, agent in enumerate(group): agent.reward = payoffs[actions[idx]]
 
         # Tournament selection
@@ -145,14 +145,14 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
 
 def group_split_game_averaged(num_runs: int, num_agents: int, num_groups: int, num_generations: int, 
                      cost_benefit_ratio: float, cooperation_threshold: float, group_split_size: int, split_mode: str):
-    averaged_cooperation = np.array([0.0] * num_generations)
+    cooperation_ratios = []
     for i in range(num_runs):
         results = group_split_game(num_agents, num_groups, num_generations, 
                                    cost_benefit_ratio, cooperation_threshold, group_split_size, split_mode)
         
-        averaged_cooperation += np.divide(results[4], num_agents)
+        cooperation_ratios.append(results[4][-1] / num_agents)
 
-    return averaged_cooperation / num_runs
+    return cooperation_ratios
     
 
 
