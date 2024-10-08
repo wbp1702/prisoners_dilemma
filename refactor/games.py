@@ -23,37 +23,36 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
     recorded_population_cooperators = []
     recorded_population_rewards = []
 
+    recorded_tournament_strategy_changes = [[] for _ in range(4)]
+    recorded_group_split_strategy_changes = [[] for _ in range(4)]
+
+    for idx in range(num_groups):
+        if idx in groups:
+            recorded_group_population[idx].append(len(groups[idx]))
+            recorded_group_cooperators[idx].append(np.sum([agent.cooperates() for agent in groups[idx]]))
+            recorded_group_rewards[idx].append(np.sum([agent.reward for agent in  groups[idx]]))
+        else:
+            recorded_group_population[idx].append(0.0)
+            recorded_group_cooperators[idx].append(0.0)
+            recorded_group_rewards[idx].append(0.0)
+
     for generation in range(num_generations):
 
-        # Record Statistics
-        for idx in range(num_groups):
-            if idx in groups:
-                recorded_group_population[idx].append(len(groups[idx]))
-                recorded_group_cooperators[idx].append(np.sum([agent.cooperates() for agent in groups[idx]]))
-                recorded_group_rewards[idx].append(np.sum([agent.reward for agent in  groups[idx]]))
-            else:
-                recorded_group_population[idx].append(0.0)
-                recorded_group_cooperators[idx].append(0.0)
-                recorded_group_rewards[idx].append(0.0)
+        for changes in recorded_tournament_strategy_changes:
+            changes.append(0)
 
-        num_non_empty_groups = 0
-        num_cooperators = 0
-        num_rewards = 0
-        for idx in range(num_groups):
-            if recorded_group_population[idx][-1] > 0: num_non_empty_groups += 1
-            num_cooperators += recorded_group_cooperators[idx][-1]
-            num_rewards += recorded_group_rewards[idx][-1]
-
-        recorded_avg_group_population.append(num_agents / num_non_empty_groups)
-        recorded_population_cooperators.append(num_cooperators)
-        recorded_population_rewards.append(num_rewards)
-
+        for changes in recorded_group_split_strategy_changes:
+            changes.append(0)
 
         # Play game in groups
         for group in groups.values():
+            if len(group) == 0: continue
+
             actions = [agent.cooperates() for agent in group]
-            payoffs = utils.snowdrift_game(actions, cost_benefit_ratio)
+            payoffs = utils.snowdrift_game(actions, cost_benefit_ratio, cooperation_threshold)
             for idx, agent in enumerate(group): agent.reward = payoffs[actions[idx]]
+
+        print(f"Agent 0 GenStart Group: {population[0].tag} Reward: {population[0].reward}")
 
         # Tournament selection
         for idx in range(len(population)):
@@ -62,6 +61,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
             # if agents reward is higher do nothing, otherwise replace agent with a copy of the other agent.
             if agent.get_reward() < other.get_reward():
                 old_tag = agent.tag
+                old_strategy = agent.strategy
                 other.copy_to(agent)
                 new_tag = agent.tag
 
@@ -71,6 +71,9 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 # copy.tag = agent.tag
                 # groups[agent.tag].append(copy) # Add copy to agent's group
 
+                recorded_tournament_strategy_changes[agent.strategy * 2 + old_strategy][-1] += 1
+
+        print(f"Agent 0 After TS Group: {population[0].tag}, Strategy: {population[0].strategy}")
 
         # split_on = "smallest"
         split_on = split_mode
@@ -78,24 +81,31 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
         # Split Groups
         if split_on == "empty":
             # Choses an empty group or creates a new one if none are empty
-            empty_groups = [idx for idx, group in enumerate(groups) if len(group) == 0]
-            for idx, group in enumerate(groups):
-                
+            # empty_groups = [idx for idx, group in enumerate(groups) if len(group) == 0]
+            empty_groups = []
+            for g in range(num_groups):
+                if g not in groups or len(groups[g]) == 0:
+                    empty_groups.append(g)
+
+            tags = list(groups.keys())
+            for tag in tags:
+                group = groups[tag]
+
                 group_size = len(group)
                 if (np.random.rand() <= group_size / group_split_size):
                     if len(empty_groups) > 0:
                         new_group = empty_groups.pop()
                     else:
-                        groups.append([])
+                        # groups.append([])
                         num_groups += 1
-                        new_group = len(groups) - 1
+                        new_group = num_groups - 1
                         recorded_group_population.append([0] * generation)
                         recorded_group_cooperators.append([0] * generation)
                         recorded_group_rewards.append([0] * generation)
 
                     groups[new_group] = group[group_size//2:] # change to random
                     for agent in groups[new_group]: agent.tag = new_group
-                    groups[idx] = group[:group_size//2]
+                    del group[group_size//2:]
         elif split_on == "smallest":
             # Choses the smallest group, unless it is the smallest then nothing happens
             tags = list(groups.keys())
@@ -134,14 +144,43 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                     # make the old group remain the larger if the sum of sizes is odd.
                     num_relocations = group_size - ((len(groups[new_group]) + group_size) // 2)
                     
-                    for agent in groups[new_group]: agent.strategy = np.random.choice(group).strategy
+                    for agent in groups[new_group]: 
+                        old_strategy = agent.strategy
+                        agent.strategy = np.random.choice(group).strategy
+                        recorded_group_split_strategy_changes[agent.strategy * 2 + old_strategy][-1] += 1
 
                     groups[new_group] += group[:num_relocations] # change to random
                     for agent in groups[new_group]: agent.tag = new_group
                     del group[:num_relocations]
 
+        print(f"Agent 0 After GS Group: {population[0].tag}, Strategy: {population[0].strategy}")
+
+        # Record Statistics
+        for idx in range(num_groups):
+            if idx in groups:
+                recorded_group_population[idx].append(len(groups[idx]))
+                recorded_group_cooperators[idx].append(np.sum([agent.cooperates() for agent in groups[idx]]))
+                recorded_group_rewards[idx].append(np.sum([agent.reward for agent in  groups[idx]]))
+            else:
+                recorded_group_population[idx].append(0.0)
+                recorded_group_cooperators[idx].append(0.0)
+                recorded_group_rewards[idx].append(0.0)
+
+        num_non_empty_groups = 0
+        num_cooperators = 0
+        num_rewards = 0
+        for idx in range(num_groups):
+            if recorded_group_population[idx][-1] > 0: num_non_empty_groups += 1
+            num_cooperators += recorded_group_cooperators[idx][-1]
+            num_rewards += recorded_group_rewards[idx][-1]
+
+        recorded_avg_group_population.append(num_agents / num_non_empty_groups)
+        recorded_population_cooperators.append(num_cooperators)
+        recorded_population_rewards.append(num_rewards)
+
     return (recorded_group_population, recorded_group_cooperators, recorded_group_rewards, 
-            recorded_avg_group_population, recorded_population_cooperators, recorded_population_rewards)
+            recorded_avg_group_population, recorded_population_cooperators, recorded_population_rewards,
+            recorded_tournament_strategy_changes, recorded_group_split_strategy_changes)
 
 def group_split_game_averaged(num_runs: int, num_agents: int, num_groups: int, num_generations: int, 
                      cost_benefit_ratio: float, cooperation_threshold: float, group_split_size: int, split_mode: str):
