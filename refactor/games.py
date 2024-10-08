@@ -52,7 +52,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
             payoffs = utils.snowdrift_game(actions, cost_benefit_ratio, cooperation_threshold)
             for idx, agent in enumerate(group): agent.reward = payoffs[actions[idx]]
 
-        print(f"Agent 0 GenStart Group: {population[0].tag} Reward: {population[0].reward}")
+        # print(f"Agent 0 GenStart Group: {population[0].tag} Reward: {population[0].reward}")
 
         # Tournament selection
         for idx in range(len(population)):
@@ -73,7 +73,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
 
                 recorded_tournament_strategy_changes[agent.strategy * 2 + old_strategy][-1] += 1
 
-        print(f"Agent 0 After TS Group: {population[0].tag}, Strategy: {population[0].strategy}")
+        # print(f"Agent 0 After TS Group: {population[0].tag}, Strategy: {population[0].strategy}")
 
         # split_on = "smallest"
         split_on = split_mode
@@ -153,7 +153,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                     for agent in groups[new_group]: agent.tag = new_group
                     del group[:num_relocations]
 
-        print(f"Agent 0 After GS Group: {population[0].tag}, Strategy: {population[0].strategy}")
+        # print(f"Agent 0 After GS Group: {population[0].tag}, Strategy: {population[0].strategy}")
 
         # Record Statistics
         for idx in range(num_groups):
@@ -193,6 +193,9 @@ def group_split_game_averaged(num_runs: int, num_agents: int, num_groups: int, n
 
     return cooperation_ratios
     
+def group_split_game_many(num_simulations, *args):
+    return [group_split_game(*args) for _ in range(num_simulations)]
+
 
 
 
