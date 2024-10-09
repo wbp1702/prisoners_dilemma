@@ -128,7 +128,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                     for agent in groups[new_group]: agent.tag = new_group
                     del group[group_size//2:]
         elif split_on == "equal":
-            # Choses the smallest group and relocates their populations untill they have equal size, 
+            # Choses the smallest group and relocates their populations until they have equal size, 
             # unless it is the smallest then nothing happens
             tags = list(groups.keys())
             for tag in tags:
