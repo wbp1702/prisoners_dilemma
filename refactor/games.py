@@ -92,7 +92,8 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 group = groups[tag]
 
                 group_size = len(group)
-                if (np.random.rand() <= group_size / group_split_size):
+                # if (np.random.rand() <= group_size / group_split_size):
+                if (group_size >= group_split_size):
                     if len(empty_groups) > 0:
                         new_group = empty_groups.pop()
                     else:
@@ -114,7 +115,8 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 group = groups[tag]
                 
                 group_size = len(group)
-                if (np.random.rand() <= group_size / group_split_size):
+                # if (np.random.rand() <= group_size / group_split_size):
+                if (group_size >= group_split_size):
 
                     new_group = min(groups.items(), key=lambda x: len(x[1]) + (x[0] == tag))[0]
                     if new_group == key: continue
@@ -136,7 +138,8 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 group = groups[tag]
                 
                 group_size = len(group)
-                if (np.random.rand() <= group_size / group_split_size):
+                # if (np.random.rand() <= group_size / group_split_size):
+                if (group_size >= group_split_size):
 
                     new_group = min(groups.items(), key=lambda x: len(x[1]) + (x[0] == tag))[0]
                     if new_group == key: continue
