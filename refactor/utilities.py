@@ -90,46 +90,43 @@ def social_dilemma(actions: list[bool], cost_benefit_ratio: float, cooperation_t
     return (payoffs[0], payoffs[1])
 
 # Calculate the payoffs for a N-Player Snowdrift Game 
-def snowdrift_game(actions: list[bool], cost_benefit_ratio: float, cooperation_threshold: float) -> tuple[float, float]:
-    if cost_benefit_ratio <= 0: raise ValueError("cost_benefit_ratio must be greater than zero")
+def snowdrift_game(actions: list[bool], cost_benefit_ratio: float, cooperation_threshold) -> tuple[float, float]:
+    # if cost_benefit_ratio <= 0: raise ValueError("cost_benefit_ratio must be greater than zero")
     
-    # benefit = 1 / cost_benefit_ratio
-    # cost = 1
     benefit = 1
     cost = cost_benefit_ratio
     
     num_cooperators = np.sum(actions)
 
-    # payoffs = np.array([
-    #     benefit if num_cooperators > 0 else 0, # decectors
-    #     (benefit - cost / num_cooperators) if num_cooperators else 0 # cooperators
-    # ])
-
-    # return (payoffs[0], payoffs[1])
-    
-    # num_cooperators = np.sum(actions)
-    # benefit = 1 / cost_benefit_ratio
-    # cost = 1
-
-    if cooperation_threshold == 0 and num_cooperators == 0:
-        defector_payoff = benefit
-        cooperator_payoff = benefit
-    # elif num_cooperators / len(actions) >= cooperation_threshold:
-    elif num_cooperators >= cooperation_threshold:
-        defector_payoff = benefit
-        cooperator_payoff = benefit - cost / num_cooperators
-    else:
-        defector_payoff = 0
-        cooperator_payoff = 0
-        
+    if isinstance(cooperation_threshold, float):
+        if cooperation_threshold == 0 and num_cooperators == 0:
+            defector_payoff = benefit
+            cooperator_payoff = benefit
+        elif num_cooperators / len(actions) >= cooperation_threshold:
+            defector_payoff = benefit
+            cooperator_payoff = benefit - cost / num_cooperators
+        else:
+            defector_payoff = 0
+            cooperator_payoff = 0
+    elif isinstance(cooperation_threshold, int):
+        if cooperation_threshold == 0 and num_cooperators == 0:
+            defector_payoff = benefit
+            cooperator_payoff = benefit
+        elif num_cooperators >= cooperation_threshold:
+            defector_payoff = benefit
+            cooperator_payoff = benefit - cost / num_cooperators
+        else:
+            defector_payoff = 0
+            cooperator_payoff = 0
+            
     return (defector_payoff, cooperator_payoff)
 
 # Calculate the payoffs for a N-Player Prisoner's Dilemma 
 def prisoners_dilemma(actions: list[bool], cost_benefit_ratio: float) -> tuple[float, float]:
-    if cost_benefit_ratio <= 0: raise ValueError("cost_benefit_ratio must be greater than zero")
+    # if cost_benefit_ratio <= 0: raise ValueError("cost_benefit_ratio must be greater than zero")
     
-    benefit = 1 / cost_benefit_ratio
-    cost = 1
+    benefit = 1
+    cost = cost_benefit_ratio
     
     num_cooperators = np.sum(actions)
 

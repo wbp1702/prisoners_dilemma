@@ -4,8 +4,10 @@ import numpy.typing as npt
 
 # Groups split (agents can change tags)
 # Split modes in ['empty', 'smallest', 'equal']
+# if cooperation_threshold is a float, then a proportion cooperation_threshold of the group must be cooperators to recieve a reward.
+# if cooperation_threshold is a int, then at least cooperation_threshold members must be cooperators to recieve a reward.
 def group_split_game(num_agents: int, num_groups: int, num_generations: int, 
-                     cost_benefit_ratio: float, cooperation_threshold: float, group_split_size: int, split_mode: str):
+                     cost_benefit_ratio: float, cooperation_threshold, group_split_size: int, split_mode: str, split_probabilistic: bool, n_player_game: str):
     population = [utils.Agent(np.random.randint(num_groups), np.random.randint(2)) for _ in range(num_agents)]
     groups: dict[int, list[utils.Agent]] = { }
     for agent in population:
@@ -49,10 +51,11 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
             if len(group) == 0: continue
 
             actions = [agent.cooperates() for agent in group]
-            payoffs = utils.snowdrift_game(actions, cost_benefit_ratio, cooperation_threshold)
+            if n_player_game == 'snowdrift':
+                payoffs = utils.snowdrift_game(actions, cost_benefit_ratio, cooperation_threshold)
+            elif n_player_game == 'prisoners dilemma':
+                payoffs = utils.prisoners_dilemma(actions, cost_benefit_ratio)
             for idx, agent in enumerate(group): agent.reward = payoffs[actions[idx]]
-
-        # print(f"Agent 0 GenStart Group: {population[0].tag} Reward: {population[0].reward}")
 
         # Tournament selection
         for idx in range(len(population)):
@@ -68,20 +71,11 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 groups[old_tag].remove(agent)
                 groups[new_tag].append(agent) # Add copy to other's group
                 
-                # copy.tag = agent.tag
-                # groups[agent.tag].append(copy) # Add copy to agent's group
-
                 recorded_tournament_strategy_changes[agent.strategy * 2 + old_strategy][-1] += 1
 
-        # print(f"Agent 0 After TS Group: {population[0].tag}, Strategy: {population[0].strategy}")
-
-        # split_on = "smallest"
-        split_on = split_mode
-
         # Split Groups
-        if split_on == "empty":
+        if split_mode == "empty":
             # Choses an empty group or creates a new one if none are empty
-            # empty_groups = [idx for idx, group in enumerate(groups) if len(group) == 0]
             empty_groups = []
             for g in range(num_groups):
                 if g not in groups or len(groups[g]) == 0:
@@ -92,12 +86,10 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 group = groups[tag]
 
                 group_size = len(group)
-                # if (np.random.rand() <= group_size / group_split_size):
-                if (group_size >= group_split_size):
+                if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
                     if len(empty_groups) > 0:
                         new_group = empty_groups.pop()
                     else:
-                        # groups.append([])
                         num_groups += 1
                         new_group = num_groups - 1
                         recorded_group_population.append([0] * generation)
@@ -107,7 +99,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                     groups[new_group] = group[group_size//2:] # change to random
                     for agent in groups[new_group]: agent.tag = new_group
                     del group[group_size//2:]
-        elif split_on == "smallest":
+        elif split_mode == "smallest":
             # Choses the smallest group, unless it is the smallest then nothing happens
             tags = list(groups.keys())
             for tag in tags:
@@ -115,21 +107,16 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 group = groups[tag]
                 
                 group_size = len(group)
-                # if (np.random.rand() <= group_size / group_split_size):
-                if (group_size >= group_split_size):
-
+                if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
                     new_group = min(groups.items(), key=lambda x: len(x[1]) + (x[0] == tag))[0]
                     if new_group == key: continue
 
-                    # num_clones = len(groups[new_group])
-                    # if num_clones > 0:
-                    #     pass
                     for agent in groups[new_group]: agent.strategy = np.random.choice(group).strategy
 
                     groups[new_group] += group[group_size//2:] # change to random
                     for agent in groups[new_group]: agent.tag = new_group
                     del group[group_size//2:]
-        elif split_on == "equal":
+        elif split_mode == "equal":
             # Choses the smallest group and relocates their populations until they have equal size, 
             # unless it is the smallest then nothing happens
             tags = list(groups.keys())
@@ -138,9 +125,7 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                 group = groups[tag]
                 
                 group_size = len(group)
-                # if (np.random.rand() <= group_size / group_split_size):
-                if (group_size >= group_split_size):
-
+                if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
                     new_group = min(groups.items(), key=lambda x: len(x[1]) + (x[0] == tag))[0]
                     if new_group == key: continue
 
@@ -155,8 +140,6 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
                     groups[new_group] += group[:num_relocations] # change to random
                     for agent in groups[new_group]: agent.tag = new_group
                     del group[:num_relocations]
-
-        # print(f"Agent 0 After GS Group: {population[0].tag}, Strategy: {population[0].strategy}")
 
         # Record Statistics
         for idx in range(num_groups):
