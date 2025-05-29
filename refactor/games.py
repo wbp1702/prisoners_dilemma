@@ -1,13 +1,16 @@
+from itertools import batched
 import utilities as utils
 import numpy as np
 import numpy.typing as npt
+import random
 
 # Groups split (agents can change tags)
 # Split modes in ['empty', 'smallest', 'equal']
 # if cooperation_threshold is a float, then a proportion cooperation_threshold of the group must be cooperators to recieve a reward.
 # if cooperation_threshold is a int, then at least cooperation_threshold members must be cooperators to recieve a reward.
 def group_split_game(num_agents: int, num_groups: int, num_generations: int, 
-                     cost_benefit_ratio: float, cooperation_threshold, group_split_size: int, split_mode: str, split_probabilistic: bool, n_player_game: str):
+                     cost_benefit_ratio: float, cooperation_threshold, group_split_size: int, split_mode: str, split_probabilistic: bool, n_player_game: str,
+                     disable_tournament_selection=False, disable_group_selection=False, game_size=0):
     population = [utils.Agent(np.random.randint(num_groups), np.random.randint(2)) for _ in range(num_agents)]
     groups: dict[int, list[utils.Agent]] = { }
     for agent in population:
@@ -50,96 +53,122 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
         for group in groups.values():
             if len(group) == 0: continue
 
-            actions = [agent.cooperates() for agent in group]
-            if n_player_game == 'snowdrift':
-                payoffs = utils.snowdrift_game(actions, cost_benefit_ratio, cooperation_threshold)
-            elif n_player_game == 'prisoners dilemma':
-                payoffs = utils.prisoners_dilemma(actions, cost_benefit_ratio)
-            for idx, agent in enumerate(group): agent.reward = payoffs[actions[idx]]
+            if game_size == 0:
+                actions = [agent.cooperates() for agent in group]
+                if n_player_game == 'snowdrift':
+                    payoffs = utils.snowdrift_game(actions, cost_benefit_ratio, cooperation_threshold)
+                elif n_player_game == 'prisoners dilemma':
+                    payoffs = utils.prisoners_dilemma(actions, cost_benefit_ratio)
+                for idx, agent in enumerate(group): agent.reward = payoffs[actions[idx]]
+            else:
+                game_groups = list(batched(group, game_size))
+                for game in game_groups:
+                    game = list(game)
+                    while len(game) < game_size:
+                        game.append(np.random.choice(group))
+
+                    actions = [agent.cooperates() for agent in game]
+                    if n_player_game == 'snowdrift':
+                        payoffs = utils.snowdrift_game(actions, cost_benefit_ratio, cooperation_threshold)
+                    elif n_player_game == 'prisoners dilemma':
+                        payoffs = utils.prisoners_dilemma(actions, cost_benefit_ratio)
+                    for idx, agent in enumerate(game): agent.reward = payoffs[actions[idx]]
+
 
         # Tournament selection
-        for idx in range(len(population)):
-            agent = population[idx]
-            other: utils.Agent = np.random.choice(population)
-            # if agents reward is higher do nothing, otherwise replace agent with a copy of the other agent.
-            if agent.get_reward() < other.get_reward():
-                old_tag = agent.tag
-                old_strategy = agent.strategy
-                other.copy_to(agent)
-                new_tag = agent.tag
+        if not disable_tournament_selection:
+            for idx in range(len(population)):
+                agent = population[idx]
+                other: utils.Agent = np.random.choice(population)
+                # if agents reward is higher do nothing, otherwise replace agent with a copy of the other agent.
+                if agent.get_reward() < other.get_reward():
+                    old_tag = agent.tag
+                    old_strategy = agent.strategy
+                    other.copy_to(agent)
+                    new_tag = agent.tag
 
-                groups[old_tag].remove(agent)
-                groups[new_tag].append(agent) # Add copy to other's group
-                
-                recorded_tournament_strategy_changes[agent.strategy * 2 + old_strategy][-1] += 1
+                    groups[old_tag].remove(agent)
+                    groups[new_tag].append(agent) # Add copy to other's group
+                    
+                    recorded_tournament_strategy_changes[agent.strategy * 2 + old_strategy][-1] += 1
+
+        for agent in population:
+            if np.random.rand() < 0.005:
+                # agent : utils.Agent = np.random.choice(population)
+                new_tag = random.choice(list(groups.keys()))
+
+                groups[agent.tag].remove(agent)
+                groups[new_tag].append(agent)
+                agent.tag = new_tag
 
         # Split Groups
-        if split_mode == "empty":
-            # Choses an empty group or creates a new one if none are empty
-            empty_groups = []
-            for g in range(num_groups):
-                if g not in groups or len(groups[g]) == 0:
-                    empty_groups.append(g)
+        if not disable_group_selection:
+            if split_mode == "empty":
+                # Choses an empty group or creates a new one if none are empty
+                empty_groups = []
+                for g in range(num_groups):
+                    if g not in groups or len(groups[g]) == 0:
+                        empty_groups.append(g)
 
-            tags = list(groups.keys())
-            for tag in tags:
-                group = groups[tag]
+                tags = list(groups.keys())
+                for tag in tags:
+                    group = groups[tag]
 
-                group_size = len(group)
-                if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
-                    if len(empty_groups) > 0:
-                        new_group = empty_groups.pop()
-                    else:
-                        num_groups += 1
-                        new_group = num_groups - 1
-                        recorded_group_population.append([0] * generation)
-                        recorded_group_cooperators.append([0] * generation)
-                        recorded_group_rewards.append([0] * generation)
+                    group_size = len(group)
+                    if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
+                        if len(empty_groups) > 0:
+                            new_group = empty_groups.pop()
+                        else:
+                            num_groups += 1
+                            new_group = num_groups - 1
+                            recorded_group_population.append([0] * generation)
+                            recorded_group_cooperators.append([0] * generation)
+                            recorded_group_rewards.append([0] * generation)
 
-                    groups[new_group] = group[group_size//2:] # change to random
-                    for agent in groups[new_group]: agent.tag = new_group
-                    del group[group_size//2:]
-        elif split_mode == "smallest":
-            # Choses the smallest group, unless it is the smallest then nothing happens
-            tags = list(groups.keys())
-            for tag in tags:
-                key = tag
-                group = groups[tag]
-                
-                group_size = len(group)
-                if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
-                    new_group = min(groups.items(), key=lambda x: len(x[1]) + (x[0] == tag))[0]
-                    if new_group == key: continue
-
-                    for agent in groups[new_group]: agent.strategy = np.random.choice(group).strategy
-
-                    groups[new_group] += group[group_size//2:] # change to random
-                    for agent in groups[new_group]: agent.tag = new_group
-                    del group[group_size//2:]
-        elif split_mode == "equal":
-            # Choses the smallest group and relocates their populations until they have equal size, 
-            # unless it is the smallest then nothing happens
-            tags = list(groups.keys())
-            for tag in tags:
-                key = tag
-                group = groups[tag]
-                
-                group_size = len(group)
-                if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
-                    new_group = min(groups.items(), key=lambda x: len(x[1]) + (x[0] == tag))[0]
-                    if new_group == key: continue
-
-                    # make the old group remain the larger if the sum of sizes is odd.
-                    num_relocations = group_size - ((len(groups[new_group]) + group_size) // 2)
+                        groups[new_group] = group[group_size//2:] # change to random
+                        for agent in groups[new_group]: agent.tag = new_group
+                        del group[group_size//2:]
+            elif split_mode == "smallest":
+                # Choses the smallest group, unless it is the smallest then nothing happens
+                tags = list(groups.keys())
+                for tag in tags:
+                    key = tag
+                    group = groups[tag]
                     
-                    for agent in groups[new_group]: 
-                        old_strategy = agent.strategy
-                        agent.strategy = np.random.choice(group).strategy
-                        recorded_group_split_strategy_changes[agent.strategy * 2 + old_strategy][-1] += 1
+                    group_size = len(group)
+                    if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
+                        new_group = min(groups.items(), key=lambda x: len(x[1]) + (x[0] == tag))[0]
+                        if new_group == key: continue
 
-                    groups[new_group] += group[:num_relocations] # change to random
-                    for agent in groups[new_group]: agent.tag = new_group
-                    del group[:num_relocations]
+                        for agent in groups[new_group]: agent.strategy = np.random.choice(group).strategy
+
+                        groups[new_group] += group[group_size//2:] # change to random
+                        for agent in groups[new_group]: agent.tag = new_group
+                        del group[group_size//2:]
+            elif split_mode == "equal":
+                # Choses the smallest group and relocates their populations until they have equal size, 
+                # unless it is the smallest then nothing happens
+                tags = list(groups.keys())
+                for tag in tags:
+                    key = tag
+                    group = groups[tag]
+                    
+                    group_size = len(group)
+                    if (split_probabilistic and np.random.rand() <= group_size / group_split_size) or (not split_probabilistic and group_size >= group_split_size):
+                        new_group = min(groups.items(), key=lambda x: len(x[1]) + (x[0] == tag))[0]
+                        if new_group == key: continue
+
+                        # make the old group remain the larger if the sum of sizes is odd.
+                        num_relocations = group_size - ((len(groups[new_group]) + group_size) // 2)
+                        
+                        for agent in groups[new_group]: 
+                            old_strategy = agent.strategy
+                            agent.strategy = np.random.choice(group).strategy
+                            recorded_group_split_strategy_changes[agent.strategy * 2 + old_strategy][-1] += 1
+
+                        groups[new_group] += group[:num_relocations] # change to random
+                        for agent in groups[new_group]: agent.tag = new_group
+                        del group[:num_relocations]
 
         # Record Statistics
         for idx in range(num_groups):
