@@ -1,3 +1,4 @@
+from warnings import deprecated
 import numpy as np
 import matplotlib.pylab as plt
 
@@ -52,6 +53,7 @@ def tournament_selection(population: list[Agent]):
     return new_population
 
 # Generates a new population using Roulette Selection
+@deprecated
 def roulette_selection(population: list[Agent]):
     new_population = []
 
@@ -63,7 +65,8 @@ def roulette_selection(population: list[Agent]):
         new_population.append(choice.copy())
 
 
-# Calculate the payoffs for a N-Player Social Dilemma 
+# Calculate the payoffs for a N-Player Social Dilemma
+@deprecated
 def social_dilemma(actions: list[bool], cost_benefit_ratio: float, cooperation_threshold: float, normalize_rewards: bool= True) -> tuple[float, float]:
     if cost_benefit_ratio <= 0: raise ValueError("cost_benefit_ratio must be greater than zero")
     if cooperation_threshold < 0 or cooperation_threshold > 1: raise ValueError("cooperation_threshold must be greater inside the interval [0, 1]")

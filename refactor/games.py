@@ -1,9 +1,11 @@
 from itertools import batched
+from warnings import deprecated
 import utilities as utils
 import numpy as np
 import numpy.typing as npt
 import random
 
+# runs one simulation with tournament and group selection
 # Groups split (agents can change tags)
 # Split modes in ['empty', 'smallest', 'equal']
 # if cooperation_threshold is a float, then a proportion cooperation_threshold of the group must be cooperators to recieve a reward.
@@ -197,6 +199,9 @@ def group_split_game(num_agents: int, num_groups: int, num_generations: int,
             recorded_avg_group_population, recorded_population_cooperators, recorded_population_rewards,
             recorded_tournament_strategy_changes, recorded_group_split_strategy_changes)
 
+
+# run multiple simulations with the same parameters and average results
+@deprecated
 def group_split_game_averaged(num_runs: int, num_agents: int, num_groups: int, num_generations: int, 
                      cost_benefit_ratio: float, cooperation_threshold: float, group_split_size: int, split_mode: str):
     cooperation_ratios = []
@@ -207,14 +212,16 @@ def group_split_game_averaged(num_runs: int, num_agents: int, num_groups: int, n
         cooperation_ratios.append(results[4][-1] / num_agents)
 
     return cooperation_ratios
-    
+
+
+# run multiple simulations with the same parameters and return all results
 def group_split_game_many(num_simulations, *args):
     return [group_split_game(*args) for _ in range(num_simulations)]
 
 
 
 
-
+# runs one simulation with only tournament selection
 # Agents play a n-player game and are reproduced by fitness
 def nplayer_group_game(num_agents: int, num_groups: int, num_generations: int, 
                        cost_benefit_ratio: float, mu_tag: float, mu_strategy: float):
@@ -282,6 +289,10 @@ def nplayer_group_game(num_agents: int, num_groups: int, num_generations: int,
 
 
 
+
+###############################################################################
+# Early code for an experiment where agents have skills that are complementary
+###############################################################################
 
 class SkilledAgent:
     def __init__(self, tag= None, skill= None):
